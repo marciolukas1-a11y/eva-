@@ -318,7 +318,9 @@
   (function() {
 
     // ── CONFIG ──────────────────────────────────────────────────────────
-    const ZAPIA_API    = "https://api.zapia.com/v1/chat";
+    const GROQ_API     = "https://api.groq.com/openai/v1/chat/completions";
+    const GROQ_MODEL   = "llama-3.3-70b-versatile";
+    let   GROQ_KEY     = localStorage.getItem("eva_groq_key") || "";
     const ELEVEN_VOICE = "OjcGK1RXdMD1PFj2eIuN"; // Larissa — voz da Eva
     const ELEVEN_API   = "https://api.elevenlabs.io/v1";
 
@@ -586,19 +588,20 @@ Celebra as conquistas dele, mesmo as pequenas. Encoraja sem pressionar.`;
       addMsg("loader");
 
       try {
-        const res = await fetch(ZAPIA_API, {
+        const res = await fetch(GROQ_API, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + GROQ_KEY
+          },
           body: JSON.stringify({
-            system: SYSTEM_PROMPT,
-            messages: history,
+            model: GROQ_MODEL,
+            messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
             max_tokens: 300
           })
         });
         const data = await res.json();
-        const reply = data.content?.[0]?.text
-                   || data.message
-                   || data.reply
+        const reply = data.choices?.[0]?.message?.content
                    || "Desculpa, não consegui responder agora.";
 
         history.push({ role: "assistant", content: reply });
@@ -671,14 +674,34 @@ Celebra as conquistas dele, mesmo as pequenas. Encoraja sem pressionar.`;
       speak("Tô aqui, Márcio! Pode falar.");
     });
 
+    // Groq Modal
+    const groqModal = document.getElementById("groqModal");
+    const groqInput = document.getElementById("groqInput");
+    const groqSave  = document.getElementById("groqSave");
+
+    function showGroqModal() { groqModal.style.display = "flex"; setTimeout(() => groqInput.focus(), 100); }
+    function hideGroqModal() { groqModal.style.display = "none"; }
+
+    groqSave.addEventListener("click", () => {
+      const k = groqInput.value.trim();
+      if (!k) return;
+      GROQ_KEY = k;
+      localStorage.setItem("eva_groq_key", k);
+      hideGroqModal();
+      addMsg("sys", "✅ Cérebro da Eva ativado!");
+      if (!ELEVEN_KEY) showKeyModal();
+    });
+
     // Init
     setOrbState("idle");
 
     // Primeira mensagem
     addMsg("ai", "Oi Márcio! Sou a Eva 🟣 Toque na bolinha ou diga \"eva ouve\" pra eu te escutar!");
 
-    // Pedir chave se não tiver
-    if (!ELEVEN_KEY) {
+    // Pedir chave Groq se não tiver
+    if (!GROQ_KEY) {
+      setTimeout(() => showGroqModal(), 800);
+    } else if (!ELEVEN_KEY) {
       setTimeout(() => showKeyModal(), 800);
     }
 
